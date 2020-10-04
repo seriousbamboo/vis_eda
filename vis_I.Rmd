@@ -1,105 +1,216 @@
 ---
-title: "Data Manipulation"
+title: "Vis_I"
 output: github_document
 ---
 
 ```{r setup}
 library(tidyverse)
+library(ggridges)
+library(hexbin)
 ```
 
-## Load in the FAS litters data
-
+## Load the weather data
 ```{r}
-litters_df = read_csv("./data/FAS_litters.csv")
-litters_df = janitor::clean_names(litters_df)
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+
+
+weather_df
 ```
 
-##  `select`
 
-Choose some columns and not others
+## Scatterplots!!
+
+Create my first scatterplot ever!
 
 ```{r}
-select(litters_df, group, gd0_weight)
+ggplot(weather_df, aes(x = tmin, y = tmax)) +
+  geom_point()
+```
+
+New approach, same plot!
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y =tmax)) +
+  geom_point()
+```
+
+Save and edit a plot object!
+
+```{r}
+weather_plot = 
+  weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax))
+
+weather_plot + geom_point()
+```
+
+Advanced scatterplot
+
+Start with the same one and make it fancy
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y =tmax, color = name)) +
+  geom_point() +
+  geom_smooth(se = F)
+
+```
+
+`aes` placement?
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y =tmax)) +
+  geom_point(aes(color = name)) +
+  geom_smooth()
+```
+
+Let's facet the same thing! .denote nothing stands for rows(try name ~ .)
+geom_pint alpha controls the transparency (values or variable less transparency for greater value) try: alpha = tmin in ggplot
+can use size for both geom_point/geom_smooth
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y =tmax, color = name)) +
+  geom_point(alpha = .2, size = .3) +
+  geom_smooth(se = F) +
+  facet_grid(. ~ name)
+```
+
+Let's combine elements and try a new plot!
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = date, y = tmax, color = name)) +
+  geom_point(aes(size = prcp), alpha = .5) +
+  geom_smooth(se = F) +
+  facet_grid(. ~ name)
+```
+
+## Some small notes
+
+how many geoms have to exist?
+
+you can have whatever geom you want.
+
+```{r not recommended through}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_smooth(se = F)
+```
+
+You can use a neat geom! (require hexbin)
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_hex()
+
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_bin2d()
+
+weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax)) +
+  geom_density2d() +
+  geom_point(alpha = .2)
+```
+
+## Univerate plots
+
+Histogram are really great!
+
+```{r}
+weather_df %>% 
+  ggplot(aes(x = tmin)) +
+  geom_histogram()
+```
+
+Can we add color?
+
+```{r messy for multiple variables}
+weather_df %>% 
+  ggplot(aes(x = tmin, fill = name)) +
+  geom_histogram(position = "dodge")
 ```
 
 ```{r}
-select(litters_df, group, gd0_weight:gd_of_birth)
+weather_df %>% 
+  ggplot(aes(x = tmin, fill = name)) +
+  geom_histogram() +
+  facet_grid(. ~ name)
 ```
 
+Let's try a new geometry! adjust allow more individuals
+
 ```{r}
-select(litters_df, -litter_number)
+weather_df %>% 
+  ggplot(aes(x = tmin, fill = name)) +
+  geom_density(alpha = .3, adjust = .5)
 ```
 
-Renaming columns
+What about boxplot?
 
 ```{r}
-select(litters_df, GROUP = group, LitterNumber = litter_number)
+weather_df %>% 
+  ggplot(aes(x = name, y = tmax)) +
+  geom_boxplot()
 ```
 
+Trendy plot
+
 ```{r}
-rename(litters_df, GROUP = group, LitterNumber = litter_number)
+weather_df %>% 
+  ggplot(aes(x = name, y = tmin, fill = name)) +
+  geom_violin(alpha = .5) +
+  stat_summary(fun = "median")
 ```
 
-Select helpers
+Ridge plots = the most popular plot of 2017
 
 ```{r}
-select(litters_df, starts_with("gd"))
+weather_df %>% 
+  ggplot(aes(x = tmin, y = name)) +
+  geom_density_ridges()
 ```
 
+## Save and embed
+
+Let's save a scatterplot!
+
 ```{r}
-select(litters_df, litter_number, everything())
+weather_plot =   
+  weather_df %>% 
+  ggplot(aes(x = tmin, y = tmax, color = name)) +
+  geom_point(alpha = .5)
+
+ggsave("./results/weather_plot.pdf", width = 8, height = 5)
 ```
 
-```{r}
-relocate(litters_df, litter_number, everything())
+What about embed?
+
+```{r,fig.width=6, fig.height=3}
+weather_plot
 ```
 
-## `filter`
+Embed at different size
 
-```{r}
-filter(litters_df, gd0_weight >= 22)
-```
-
-```{r}
-filter(litters_df, !(gd0_weight == 20))
-```
-
-```{r}
-filter(litters_df, group %in% c("Con7","Mod7"))
-```
-
-## `mutate`
-
-```{r}
-mutate(
-  litters_df, 
-  wt_gain = gd18_weight - gd0_weight,
-  group = str_to_lower(group))
-```
-
-##  `arrange`
-
-```{r}
-arrange(litters_df, pups_born_alive, gd0_weight)
-```
-
-## ` %>% `
-
-```{r}
-litters_df = 
-  read_csv("./data/FAS_litters.csv") %>% 
-  janitor::clean_names() %>% 
-  select(-pups_survive) %>% 
-  mutate(wt_gain = gd18_weight - gd0_weight) %>% 
-  drop_na(gd0_weight)
-```
-
-```{r}
-read_csv("./data/FAS_pups.csv") %>% 
-  janitor::clean_names() %>% 
-  select(.data = ., -pd_ears) %>% 
-  filter(.data = ., sex == 1) %>% 
-  mutate(.data = ., pd_pivot_GT7 = pd_pivot > 7)
-  
+```{rfig.width=12, fig.height=6}
+weather_df
 ```
 
